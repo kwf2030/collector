@@ -1,0 +1,10 @@
+github.com/gorilla/websocket v1.4.0 h1:WDFjx/TMzVgy9VdMMQi2K2Emtwi2QcUQsztZ/zLaH/Q=
+github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
+github.com/kwf2030/cdp v1.0.0 h1:XA9ikivcr6C3R6HxKgFDZp/FRVx+4QCPUGysWuVjNWc=
+github.com/kwf2030/cdp v1.0.0/go.mod h1:U6d2YL1/tV++pkPlZlPlH79wuLovAeVTn67hG6G8pkw=
+github.com/kwf2030/commons v0.0.0-20190612025443-7d2746f9eaef h1:p0d9tINTCr/8fwFC7aW7BHmfkGeRRfiInwwQW8rvPIQ=
+github.com/kwf2030/commons v0.0.0-20190612025443-7d2746f9eaef/go.mod h1:G2aEEgqDDg+eUhA5XoEbfINyxorLxOJVBrN8EurWAS0=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v2 v2.2.2 h1:ZCJp+EgiOT7lHqUV2J862kp8Qj64Jo6az82+3Td9dZw=
+gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
