@@ -15,7 +15,7 @@ import (
 
 var (
   ErrInvalidArgs   = errors.New("invalid args")
-  ErrNoMatchedRule = errors.New("no matched rule")
+  ErrNoRuleMatched = errors.New("no rule matched")
 
   chrome *cdp.Chrome
 )
@@ -33,8 +33,10 @@ type Page struct {
   Url   string
   Group string
 
-  rule    *rule
-  tab     *cdp.Tab
+  rule *Rule
+
+  tab *cdp.Tab
+
   handler Handler
 
   once sync.Once
@@ -50,7 +52,7 @@ func NewPage(id, url, group string) *Page {
 func (p *Page) OnCdpEvent(msg *cdp.Message) {
   if msg.Method == cdp.Page.LoadEventFired {
     // 如果超时，就有可能存在两次回调（超时一次回调和正常一次回调），
-    // once就是为了防止重复调用
+    // once是为了防止重复调用
     p.once.Do(func() {
       m := p.crawlFields()
       if p.handler != nil {
@@ -80,7 +82,7 @@ func (p *Page) Crawl(h Handler) error {
   addr := html.UnescapeString(p.Url)
   rule := Rules.match(p.Group, addr)
   if rule == nil {
-    return ErrNoMatchedRule
+    return ErrNoRuleMatched
   }
   tab, e := chrome.NewTab(p)
   if e != nil {
@@ -93,7 +95,7 @@ func (p *Page) Crawl(h Handler) error {
   tab.Call(cdp.Page.Enable, nil)
   tab.Call(cdp.Page.Navigate, cdp.Param{"url": addr})
   // todo 大量定时器，如果有性能问题改用时间轮
-  time.AfterFunc(p.rule.pageLoadTimeout, func() {
+  time.AfterFunc(p.rule.timeout, func() {
     tab.FireEvent(cdp.Page.LoadEventFired, nil)
   })
   return nil
@@ -117,46 +119,31 @@ func (p *Page) crawlFields() map[string]string {
         return ret
       }
     }
-    if rule.Prepare.waitWhenReady > 0 {
-      time.Sleep(rule.Prepare.waitWhenReady)
+    if rule.Prepare.wait > 0 {
+      time.Sleep(rule.Prepare.wait)
     }
   }
   for _, field := range rule.Fields {
-    switch {
-    case field.Eval != "" && field.Value != "":
-      params["expression"] = fmt.Sprintf("{let value='%s';%s}", field.Value, field.Eval)
-      if !field.Export {
-        p.tab.Call(cdp.Runtime.Evaluate, params)
+    if field.Eval != "" {
+      if field.Value != "" {
+        params["expression"] = fmt.Sprintf("{let value='%s';%s}", field.Value, field.Eval)
       } else {
-        _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-        msg := <-ch
-        r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
-        ret[field.Name] = r
-        params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, r)
-        p.tab.Call(cdp.Runtime.Evaluate, params)
+        if field.Eval[0] == '{' {
+          params["expression"] = field.Eval
+        } else {
+          params["expression"] = "{" + field.Eval + "}"
+        }
       }
-
-    case field.Value != "":
+      _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
+      msg := <-ch
+      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      ret[field.Name] = r
+      params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, r)
+      p.tab.Call(cdp.Runtime.Evaluate, params)
+    } else if field.Value != "" {
       ret[field.Name] = field.Value
       params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, field.Value)
       p.tab.Call(cdp.Runtime.Evaluate, params)
-
-    case field.Eval != "":
-      if field.Eval[0] == '{' {
-        params["expression"] = field.Eval
-      } else {
-        params["expression"] = "{" + field.Eval + "}"
-      }
-      if !field.Export {
-        p.tab.Call(cdp.Runtime.Evaluate, params)
-      } else {
-        _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-        msg := <-ch
-        r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
-        ret[field.Name] = r
-        params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, r)
-        p.tab.Call(cdp.Runtime.Evaluate, params)
-      }
     }
     if field.wait > 0 {
       time.Sleep(field.wait)
@@ -182,23 +169,21 @@ func (p *Page) crawlLoop() {
         return
       }
     }
-    if rule.Loop.Prepare.waitWhenReady > 0 {
-      time.Sleep(rule.Loop.Prepare.waitWhenReady)
+    if rule.Loop.Prepare.wait > 0 {
+      time.Sleep(rule.Loop.Prepare.wait)
     }
   }
   if rule.Loop.Eval != "" && rule.Loop.Eval[0] != '{' {
     rule.Loop.Eval = "{" + rule.Loop.Eval + "}"
   }
-  if rule.Loop.Break != "" && rule.Loop.Break[0] != '{' {
-    rule.Loop.Break = "{" + rule.Loop.Break + "}"
-  }
   if rule.Loop.Next != "" && rule.Loop.Next[0] != '{' {
     rule.Loop.Next = "{" + rule.Loop.Next + "}"
   }
   var v string
-  i := 1
+  i := 0
   bp := make([]string, rule.Loop.ExportCycle)
   for {
+    i++
     // eval
     if rule.Loop.Eval != "" {
       params["expression"] = rule.Loop.Eval
@@ -221,30 +206,15 @@ func (p *Page) crawlLoop() {
         }
       }
     }
-
-    // break
-    if rule.Loop.Break != "" {
-      params["expression"] = rule.Loop.Break
-      _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-      msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "false")
-      if r == "true" {
-        break
-      }
-    }
-
     // next
     if rule.Loop.Next != "" {
       params["expression"] = rule.Loop.Next
       p.tab.Call(cdp.Runtime.Evaluate, params)
     }
-
     // wait
     if rule.Loop.wait > 0 {
       time.Sleep(rule.Loop.wait)
     }
-
-    i++
   }
 }
 
