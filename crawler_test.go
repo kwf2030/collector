@@ -8,33 +8,32 @@ import (
 
 var wg sync.WaitGroup
 
-var testRule = []byte(`id: "1"
+var testRule = []byte(`id: "jd"
 version: 1
 name: "jd"
 alias: "京东"
-priority: 100
 group: "default"
+priority: 100
 
 patterns:
   - "jd.com"
 
-page_load_timeout: "10s"
+timeout: "10s"
 
 fields:
   - name: price
-    eval: "document.querySelector('.J-p-6655821').textContent"
+    eval: "document.querySelector('.J-p-100000700300').textContent"
     export: true
 
 loop:
-  name: "page"
+  name: "comment"
   alias: "最新10页评论"
   export_cycle: 5
   prepare:
     eval: "{document.documentElement.scrollBy(0, 1000);Array.prototype.slice.call(document.querySelector('#detail > div > ul').children).filter(function (e) {return e.textContent.indexOf('商品评价') !== -1;})[0].click();true;}"
-    wait_when_ready: "2s"
+    wait: "2s"
   eval: "JSON.stringify(Array.prototype.slice.call(document.querySelectorAll('.comment-con')).map(e=>e.textContent))"
-  break: "count===10"
-  next: "document.querySelector('.ui-pager-next').click()"
+  next: "document.querySelector('.ui-pager-next').click();count===10"
   wait: "2s"
 `)
 
@@ -66,7 +65,7 @@ func TestCrawler(t *testing.T) {
   }
   wg.Add(1)
   h := &H{"JingDong"}
-  p := NewPage("1", "https://item.jd.com/6655821.html", "default")
+  p := NewPage("01", "https://item.jd.com/100000700300.html", "")
   e = p.Crawl(h)
   if e != nil {
     panic(e)

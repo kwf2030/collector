@@ -22,7 +22,7 @@ patterns:
   - "taobao.hk"
 
 prepare:
-  # 在fields和loop之前执行，且必须返回true流程才会继续
+  # 如果有值，会在fields和loop之前执行，且必须返回true流程才会继续
   eval: "javascript"
   # 在eval之后、fields和loop之前等待
   wait: "2s"
@@ -68,12 +68,13 @@ loop:
   # 设置导出周期，例如每循环5（默认为10）次导出一次（导出结果是这5次eval的返回值）
   export_cycle: 5
   prepare:
+    # 如果有值，必须返回true流程才会继续
     eval: "javascript"
     wait: "2s"
-  # 必须返回true流程才会继续
   # eval次数会作为全局变量（变量名为count，从1开始）
   eval: "javascript"
   # 下一次eval前执行（如翻页）
+  # 必须返回true循环才会继续
   next: "javascript"
   # next执行后等待时间（等待过后再开始下一轮循环的eval）
   wait: "2s"

@@ -29,8 +29,12 @@ type Handler interface {
 }
 
 type Page struct {
-  Id    string
-  Url   string
+  // 页面Id（与规则Id无关）
+  Id string
+
+  Url string
+
+  // 在该规则分组下匹配规则
   Group string
 
   rule *Rule
@@ -179,9 +183,8 @@ func (p *Page) crawlLoop() {
   if rule.Loop.Next != "" && rule.Loop.Next[0] != '{' {
     rule.Loop.Next = "{" + rule.Loop.Next + "}"
   }
-  var v string
   i := 0
-  bp := make([]string, rule.Loop.ExportCycle)
+  arr := make([]string, rule.Loop.ExportCycle)
   for {
     i++
     // eval
@@ -189,7 +192,7 @@ func (p *Page) crawlLoop() {
       params["expression"] = rule.Loop.Eval
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      v = conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
       exp := "count=" + strconv.Itoa(i) + ";"
       if i == 1 {
         exp = "let " + exp
@@ -198,18 +201,23 @@ func (p *Page) crawlLoop() {
       p.tab.Call(cdp.Runtime.Evaluate, params)
       n := i % rule.Loop.ExportCycle
       if n != 0 {
-        bp[n-1] = v
+        arr[n-1] = r
       } else {
-        bp[rule.Loop.ExportCycle-1] = v
+        arr[rule.Loop.ExportCycle-1] = r
         if p.handler != nil {
-          p.handler.OnLoop(p, i, bp)
+          p.handler.OnLoop(p, i, arr)
         }
       }
     }
     // next
     if rule.Loop.Next != "" {
       params["expression"] = rule.Loop.Next
-      p.tab.Call(cdp.Runtime.Evaluate, params)
+      _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
+      msg := <-ch
+      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      if r != "true" {
+        return
+      }
     }
     // wait
     if rule.Loop.wait > 0 {
