@@ -33,7 +33,7 @@ loop:
     eval: "{document.documentElement.scrollBy(0, 1000);Array.prototype.slice.call(document.querySelector('#detail > div > ul').children).filter(function (e) {return e.textContent.indexOf('商品评价') !== -1;})[0].click();true;}"
     wait: "2s"
   eval: "JSON.stringify(Array.prototype.slice.call(document.querySelectorAll('.comment-con')).map(e=>e.textContent))"
-  next: "document.querySelector('.ui-pager-next').click();count===10"
+  next: "document.querySelector('.ui-pager-next').click();count<=12"
   wait: "2s"
 `)
 

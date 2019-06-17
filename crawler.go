@@ -187,18 +187,18 @@ func (p *Page) crawlLoop() {
   arr := make([]string, rule.Loop.ExportCycle)
   for {
     i++
+    exp := "count=" + strconv.Itoa(i) + ";"
+    if i == 1 {
+      exp = "let " + exp
+    }
+    params["expression"] = exp
+    p.tab.Call(cdp.Runtime.Evaluate, params)
     // eval
     if rule.Loop.Eval != "" {
       params["expression"] = rule.Loop.Eval
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
       r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
-      exp := "count=" + strconv.Itoa(i) + ";"
-      if i == 1 {
-        exp = "let " + exp
-      }
-      params["expression"] = exp
-      p.tab.Call(cdp.Runtime.Evaluate, params)
       n := i % rule.Loop.ExportCycle
       if n != 0 {
         arr[n-1] = r
@@ -206,6 +206,9 @@ func (p *Page) crawlLoop() {
         arr[rule.Loop.ExportCycle-1] = r
         if p.handler != nil {
           p.handler.OnLoop(p, i, arr)
+        }
+        for k := 0; k < rule.Loop.ExportCycle; k++ {
+          arr[k] = ""
         }
       }
     }
@@ -216,6 +219,9 @@ func (p *Page) crawlLoop() {
       msg := <-ch
       r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
       if r != "true" {
+        if p.handler != nil {
+          p.handler.OnLoop(p, i, arr)
+        }
         return
       }
     }
