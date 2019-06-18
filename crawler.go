@@ -130,7 +130,7 @@ func (p *Page) crawlFields() map[string]string {
   for _, field := range rule.Fields {
     if field.Eval != "" {
       if field.Value != "" {
-        params["expression"] = fmt.Sprintf("{let value='%s';%s}", field.Value, field.Eval)
+        params["expression"] = fmt.Sprintf("{let cdp_field_value='%s';%s}", field.Value, field.Eval)
       } else {
         if field.Eval[0] == '{' {
           params["expression"] = field.Eval
@@ -142,11 +142,11 @@ func (p *Page) crawlFields() map[string]string {
       msg := <-ch
       r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
       ret[field.Name] = r
-      params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, r)
+      params["expression"] = fmt.Sprintf("const cdp_field_%s='%s'", field.Name, r)
       p.tab.Call(cdp.Runtime.Evaluate, params)
     } else if field.Value != "" {
       ret[field.Name] = field.Value
-      params["expression"] = fmt.Sprintf("const %s='%s'", field.Name, field.Value)
+      params["expression"] = fmt.Sprintf("const cdp_field_%s='%s'", field.Name, field.Value)
       p.tab.Call(cdp.Runtime.Evaluate, params)
     }
     if field.wait > 0 {
@@ -184,14 +184,14 @@ func (p *Page) crawlLoop() {
     rule.Loop.Next = "{" + rule.Loop.Next + "}"
   }
   i := 0
+  params["expression"] = "let cdp_loop_count=1;"
   arr := make([]string, rule.Loop.ExportCycle)
   for {
     i++
-    exp := "count=" + strconv.Itoa(i) + ";"
-    if i == 1 {
-      exp = "let " + exp
+    n := i % rule.Loop.ExportCycle
+    if i > 1 {
+      params["expression"] = "cdp_loop_count=" + strconv.Itoa(i) + ";"
     }
-    params["expression"] = exp
     p.tab.Call(cdp.Runtime.Evaluate, params)
     // eval
     if rule.Loop.Eval != "" {
@@ -199,17 +199,18 @@ func (p *Page) crawlLoop() {
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
       r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
-      n := i % rule.Loop.ExportCycle
-      if n != 0 {
-        arr[n-1] = r
-      } else {
+      if n == 0 {
         arr[rule.Loop.ExportCycle-1] = r
-        if p.handler != nil {
-          p.handler.OnLoop(p, i, arr)
-        }
-        for k := 0; k < rule.Loop.ExportCycle; k++ {
-          arr[k] = ""
-        }
+      } else {
+        arr[n-1] = r
+      }
+    }
+    if n == 0 {
+      if p.handler != nil {
+        p.handler.OnLoop(p, i, arr)
+      }
+      for j := 0; j < rule.Loop.ExportCycle; j++ {
+        arr[j] = ""
       }
     }
     // next
@@ -219,10 +220,10 @@ func (p *Page) crawlLoop() {
       msg := <-ch
       r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
       if r != "true" {
-        if p.handler != nil {
-          p.handler.OnLoop(p, i, arr)
+        if p.handler != nil && n != 0 {
+          p.handler.OnLoop(p, i, arr[:n])
         }
-        return
+        break
       }
     }
     // wait

@@ -27,13 +27,13 @@ fields:
 
 loop:
   name: "comment"
-  alias: "最新10页评论"
+  alias: "最新12页评论"
   export_cycle: 5
   prepare:
     eval: "{document.documentElement.scrollBy(0, 1000);Array.prototype.slice.call(document.querySelector('#detail > div > ul').children).filter(function (e) {return e.textContent.indexOf('商品评价') !== -1;})[0].click();true;}"
     wait: "2s"
   eval: "JSON.stringify(Array.prototype.slice.call(document.querySelectorAll('.comment-con')).map(e=>e.textContent))"
-  next: "document.querySelector('.ui-pager-next').click();count<=12"
+  next: "document.querySelector('.ui-pager-next').click();cdp_loop_count<=11"
   wait: "2s"
 `)
 
@@ -45,8 +45,8 @@ func (h *H) OnFields(p *Page, data map[string]string) {
   fmt.Println("======OnFields:", data)
 }
 
-func (h *H) OnLoop(p *Page, count int, data []string) {
-  fmt.Println("======OnLoop:", count, data)
+func (h *H) OnLoop(p *Page, loopCount int, data []string) {
+  fmt.Println("======OnLoop:", loopCount, data)
 }
 
 func (h *H) OnComplete(p *Page) {

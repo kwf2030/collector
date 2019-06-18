@@ -31,13 +31,12 @@ prepare:
 timeout: "30s"
 
 fields:
-  # 不要使用Javascript关键字和符号以避免冲突（可以使用下划线）
   - name: "id"
     # 返回值类型会被转为字符串
     eval: "javascript"
     # 是否导出eval结果
     # false（默认值）表示不导出（用于无需返回的eval）
-    # true表示导出，且作为Javascript全局变量（变量名为name属性），后续可直接使用
+    # true表示导出，且会作为Javascript全局变量（变量名为cdp_field_<name>），后续可直接使用
     export: true
 
   - name: "flavor"
@@ -49,7 +48,7 @@ fields:
   - name: "price"
     alias: "价格"
     # eval和value并存
-    # value会作为eval的局部变量（变量名为value），但仍以eval返回值作为导出结果
+    # value会作为eval的局部变量（变量名为cdp_field_value），但仍以eval返回值作为导出结果
     eval: "javascript"
     value: '1234'
     export: true
@@ -62,6 +61,7 @@ fields:
 
 # 无论是否有loop，都会先执行fields
 # loop内部执行顺序：prepare_eval-->prepare_wait-->loop(eval-->next-->wait)
+# 循环次数会作为全局变量（变量名为cdp_loop_count，从1开始）
 loop:
   name: "page"
   alias: "分页"
@@ -71,10 +71,8 @@ loop:
     # 如果有值，必须返回true流程才会继续
     eval: "javascript"
     wait: "2s"
-  # eval次数会作为全局变量（变量名为count，从1开始）
   eval: "javascript"
-  # 下一次eval前执行（如翻页）
-  # 必须返回true循环才会继续
+  # 如果有值，会在下一次eval前执行（如翻页），且必须返回true循环才会继续
   next: "javascript"
   # next执行后等待时间（等待过后再开始下一轮循环的eval）
   wait: "2s"
