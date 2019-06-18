@@ -1,7 +1,6 @@
 package crawler
 
 import (
-  "encoding/json"
   "fmt"
   "sync"
   "testing"
@@ -47,30 +46,17 @@ type H struct {
 }
 
 func (h *H) OnFields(p *Page, data map[string]string) {
-  fmt.Println("==========商品：")
-  for k, v := range data {
-    switch k {
-    case "title":
-      fmt.Println("标题：" + v)
-    case "price":
-      fmt.Println("价格：" + v)
-    }
-  }
+  fmt.Println("==========OnFields:")
+  fmt.Println(data)
 }
 
 func (h *H) OnLoop(p *Page, loopCount int, data []string) {
-  comments := make([]string, 0, 10)
-  e := json.Unmarshal([]byte(data[0]), &comments)
-  if e != nil {
-    panic(e)
-  }
-  fmt.Printf("\n==========评论：\n")
-  for _, v := range comments {
-    fmt.Println(v)
-  }
+  fmt.Println("==========OnLoop:", loopCount)
+  fmt.Println(data)
 }
 
 func (h *H) OnComplete(p *Page) {
+  fmt.Println("==========OnComplete")
   wg.Done()
 }
 
