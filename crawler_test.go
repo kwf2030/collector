@@ -31,7 +31,7 @@ loop:
   export_cycle: 5
   prepare:
     eval: "{document.documentElement.scrollBy(0, 1000);Array.prototype.slice.call(document.querySelector('#detail > div > ul').children).filter(function (e) {return e.textContent.indexOf('商品评价') !== -1;})[0].click();true;}"
-    wait: "2s"
+    wait: "5s"
   eval: "JSON.stringify(Array.prototype.slice.call(document.querySelectorAll('.comment-con')).map(e=>e.textContent))"
   next: "document.querySelector('.ui-pager-next').click();cdp_loop_count<=11"
   wait: "2s"
