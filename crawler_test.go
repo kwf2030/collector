@@ -1,6 +1,7 @@
 package crawler
 
 import (
+  "encoding/json"
   "fmt"
   "sync"
   "testing"
@@ -21,8 +22,12 @@ patterns:
 timeout: "10s"
 
 fields:
+  - name: title
+    eval: "document.querySelector('.sku-name').textContent.trim()"
+    export: true
+
   - name: price
-    eval: "document.querySelector('.J-p-100000700300').textContent"
+    eval: "document.querySelector('.J-p-100000700300').textContent.trim()"
     export: true
 
 loop:
@@ -42,15 +47,30 @@ type H struct {
 }
 
 func (h *H) OnFields(p *Page, data map[string]string) {
-  fmt.Println("======OnFields:", data)
+  fmt.Println("==========商品：")
+  for k, v := range data {
+    switch k {
+    case "title":
+      fmt.Println("标题：" + v)
+    case "price":
+      fmt.Println("价格：" + v)
+    }
+  }
 }
 
 func (h *H) OnLoop(p *Page, loopCount int, data []string) {
-  fmt.Println("======OnLoop:", loopCount, data)
+  comments := make([]string, 0, 10)
+  e := json.Unmarshal([]byte(data[0]), &comments)
+  if e != nil {
+    panic(e)
+  }
+  fmt.Printf("\n==========评论：\n")
+  for _, v := range comments {
+    fmt.Println(v)
+  }
 }
 
 func (h *H) OnComplete(p *Page) {
-  fmt.Println("======OnComplete")
   wg.Done()
 }
 
@@ -71,4 +91,5 @@ func TestCrawler(t *testing.T) {
     panic(e)
   }
   wg.Wait()
+  ExitChrome()
 }
