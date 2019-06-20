@@ -83,7 +83,7 @@ func TestStock(t *testing.T) {
   if e != nil {
     t.Fatal(e)
   }
-  e = LaunchChrome("C:/App/Chromium/chrome.exe")
+  e = LaunchChrome("")
   if e != nil {
     t.Fatal(e)
   }
