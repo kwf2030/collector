@@ -1,2 +1,2 @@
-# crawler
-简易爬虫。
+# collector
+简易数据采集工具。
