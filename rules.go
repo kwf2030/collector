@@ -11,28 +11,26 @@ import (
   "gopkg.in/yaml.v2"
 )
 
-var (
-  ErrGroupNotFound = errors.New("group not found")
-
-  Rules = &RuleGroups{Groups: make(map[string][]*Rule, 16), RWMutex: &sync.RWMutex{}}
-)
-
-type RuleGroups struct {
-  Groups map[string][]*Rule
-  *sync.RWMutex
+type RuleGroup struct {
+  Name  string
+  rules []*Rule
+  m     *sync.RWMutex
 }
 
-func (rg *RuleGroups) match(group, url string) *Rule {
-  if group == "" || url == "" {
+func NewRuleGroup(name string) *RuleGroup {
+  if name == "" {
     return nil
   }
-  rg.RLock()
-  defer rg.RUnlock()
-  arr, ok := rg.Groups[group]
-  if !ok {
+  return &RuleGroup{Name: name, rules: make([]*Rule, 0, 16), m: &sync.RWMutex{}}
+}
+
+func (rg *RuleGroup) match(url string) *Rule {
+  if url == "" {
     return nil
   }
-  for _, r := range arr {
+  rg.m.RLock()
+  defer rg.m.RUnlock()
+  for _, r := range rg.rules {
     for _, p := range r.patterns {
       if p.content.MatchString(url) {
         return r
@@ -42,145 +40,71 @@ func (rg *RuleGroups) match(group, url string) *Rule {
   return nil
 }
 
-func (rg *RuleGroups) FromBytes(bytes [][]byte) error {
+func (rg *RuleGroup) AppendBytes(bytes []byte) error {
   if len(bytes) == 0 {
-    return ErrInvalidArgs
+    return errors.New("param <bytes> is empty")
   }
-  m := make(map[string][]*Rule, len(bytes))
-  for _, b := range bytes {
-    r := &Rule{}
-    e := yaml.Unmarshal(b, r)
-    if e != nil {
-      return e
-    }
-    initRule(r)
-    if _, ok := m[r.Group]; !ok {
-      m[r.Group] = make([]*Rule, 0, 16)
-    }
-    m[r.Group] = append(m[r.Group], r)
+  if rg.Name == "" {
+    return errors.New("group name is empty")
   }
-  for g, r := range m {
-    e := rg.update(g, r)
-    if e != nil {
-      return e
-    }
+  r := &Rule{}
+  e := yaml.Unmarshal(bytes, r)
+  if e != nil {
+    return e
   }
-  return nil
-}
-
-func (rg *RuleGroups) FromFiles(files []string) error {
-  if len(files) == 0 {
-    return ErrInvalidArgs
+  if r.Group != rg.Name {
+    return errors.New("rule group not match")
   }
-  arr := make([][]byte, 0, len(files))
-  for _, f := range files {
-    data, e := ioutil.ReadFile(f)
-    if e != nil {
-      return e
-    }
-    arr = append(arr, data)
-  }
-  return rg.FromBytes(arr)
-}
-
-func (rg *RuleGroups) update(group string, arr []*Rule) error {
-  if group == "" || len(arr) == 0 {
-    return ErrInvalidArgs
-  }
-  rg.Lock()
-  defer rg.Unlock()
-  if _, ok := rg.Groups[group]; !ok {
-    rg.Groups[group] = make([]*Rule, 0, 16)
-  }
-  for _, r := range arr {
-    if r.Group != group {
-      continue
-    }
-    index := -1
-    for i, old := range rg.Groups[group] {
-      if old.Id == r.Id {
-        index = i
-        break
-      }
-    }
-    if index == -1 {
-      rg.Groups[group] = append(rg.Groups[group], r)
-    } else {
-      old := rg.Groups[group][index]
-      if old.Version < r.Version {
-        rg.Groups[group][index] = r
-      }
+  r.init()
+  rg.m.Lock()
+  defer rg.m.Unlock()
+  found := -1
+  for i, old := range rg.rules {
+    if old.Id == r.Id {
+      found = i
+      break
     }
   }
-  sort.SliceStable(rg.Groups[group], func(i, j int) bool {
-    return rg.Groups[group][i].Priority < rg.Groups[group][j].Priority
+  if found == -1 {
+    rg.rules = append(rg.rules, r)
+  } else {
+    if rg.rules[found].Version <= r.Version {
+      rg.rules[found] = r
+    }
+  }
+  sort.SliceStable(rg.rules, func(i, j int) bool {
+    return rg.rules[i].Priority < rg.rules[j].Priority
   })
   return nil
 }
 
-func (rg *RuleGroups) Remove(group string, ids ...string) error {
-  if group == "" {
-    return ErrInvalidArgs
+func (rg *RuleGroup) AppendFile(file string) error {
+  if file == "" {
+    return errors.New("param <file> is empty")
   }
-  rg.Lock()
-  defer rg.Unlock()
-  if _, ok := rg.Groups[group]; !ok {
-    return ErrGroupNotFound
+  if rg.Name == "" {
+    return errors.New("group name is empty")
   }
-  if len(ids) == 0 {
-    delete(rg.Groups, group)
-    return nil
+  data, e := ioutil.ReadFile(file)
+  if e != nil {
+    return e
   }
-  for _, id := range ids {
-    index := -1
-    for i, r := range rg.Groups[group] {
-      if id == r.Id {
-        index = i
-        break
-      }
-    }
-    if index != -1 {
-      rg.Groups[group] = append(rg.Groups[group][:index], rg.Groups[group][index+1:]...)
+  return rg.AppendBytes(data)
+}
+
+func (rg *RuleGroup) Remove(id string) error {
+  if id == "" {
+    return errors.New("param <id> is empty")
+  }
+  rg.m.Lock()
+  defer rg.m.Unlock()
+  for i, r := range rg.rules {
+    if r.Id == id {
+      rg.rules = append(rg.rules[:i], rg.rules[i+1:]...)
+      break
     }
   }
   return nil
-}
-
-func initRule(rule *Rule) {
-  if rule.Group == "" {
-    rule.Group = "default"
-  }
-  rule.patterns = make([]*Pattern, 0, len(rule.Patterns))
-  for _, p := range rule.Patterns {
-    re, e := regexp.Compile(p)
-    if e != nil {
-      continue
-    }
-    rule.patterns = append(rule.patterns, &Pattern{p, re})
-  }
-  if rule.Prepare != nil && rule.Prepare.Wait != "" {
-    rule.Prepare.wait, _ = time.ParseDuration(rule.Prepare.Wait)
-  }
-  rule.timeout = time.Second * 10
-  if rule.Timeout != "" {
-    rule.timeout, _ = time.ParseDuration(rule.Timeout)
-  }
-  for _, f := range rule.Fields {
-    if f.Wait != "" {
-      f.wait, _ = time.ParseDuration(f.Wait)
-    }
-  }
-  if rule.Loop != nil {
-    if rule.Loop.ExportCycle == 0 {
-      rule.Loop.ExportCycle = 10
-    }
-    if rule.Loop.Prepare != nil && rule.Loop.Prepare.Wait != "" {
-      rule.Loop.Prepare.wait, _ = time.ParseDuration(rule.Loop.Prepare.Wait)
-    }
-    if rule.Loop.Wait != "" {
-      rule.Loop.wait, _ = time.ParseDuration(rule.Loop.Wait)
-    }
-  }
 }
 
 type Rule struct {
@@ -197,6 +121,40 @@ type Rule struct {
   timeout  time.Duration `yaml:"-"`
   Fields   []*Field      `yaml:"fields"`
   Loop     *Loop         `yaml:"loop"`
+}
+
+func (r *Rule) init() {
+  r.patterns = make([]*Pattern, 0, len(r.Patterns))
+  for _, p := range r.Patterns {
+    re, e := regexp.Compile(p)
+    if e != nil {
+      continue
+    }
+    r.patterns = append(r.patterns, &Pattern{p, re})
+  }
+  if r.Prepare != nil && r.Prepare.Wait != "" {
+    r.Prepare.wait, _ = time.ParseDuration(r.Prepare.Wait)
+  }
+  r.timeout = time.Second * 10
+  if r.Timeout != "" {
+    r.timeout, _ = time.ParseDuration(r.Timeout)
+  }
+  for _, f := range r.Fields {
+    if f.Wait != "" {
+      f.wait, _ = time.ParseDuration(f.Wait)
+    }
+  }
+  if r.Loop != nil {
+    if r.Loop.ExportCycle == 0 {
+      r.Loop.ExportCycle = 10
+    }
+    if r.Loop.Prepare != nil && r.Loop.Prepare.Wait != "" {
+      r.Loop.Prepare.wait, _ = time.ParseDuration(r.Loop.Prepare.Wait)
+    }
+    if r.Loop.Wait != "" {
+      r.Loop.wait, _ = time.ParseDuration(r.Loop.Wait)
+    }
+  }
 }
 
 type Pattern struct {

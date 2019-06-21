@@ -2,13 +2,16 @@ package crawler
 
 import (
   "fmt"
+  "runtime"
   "sync"
   "testing"
+
+  "github.com/kwf2030/cdp"
 )
 
-var wg sync.WaitGroup
+var wg1 sync.WaitGroup
 
-var testRule = []byte(`id: "jd"
+var rule1 = []byte(`id: "jd"
 version: 1
 name: "jd"
 alias: "京东"
@@ -41,41 +44,49 @@ loop:
   wait: "2s"
 `)
 
-type H struct {
-  name string
-}
+type Product struct{}
 
-func (h *H) OnFields(p *Page, data map[string]string) {
+func (*Product) OnFields(p *Page, data map[string]string) {
   fmt.Println("==========OnFields:")
   fmt.Println(data)
 }
 
-func (h *H) OnLoop(p *Page, loopCount int, data []string) {
+func (*Product) OnLoop(p *Page, loopCount int, data []string) {
   fmt.Println("==========OnLoop:", loopCount)
   fmt.Println(data)
 }
 
-func (h *H) OnComplete(p *Page) {
+func (*Product) OnComplete(p *Page) {
   fmt.Println("==========OnComplete")
-  wg.Done()
+  wg1.Done()
 }
 
-func TestCrawler(t *testing.T) {
-  e := Rules.FromBytes([][]byte{testRule})
+func TestProduct(t *testing.T) {
+  bin := ""
+  switch runtime.GOOS {
+  case "windows":
+    bin = "C:/App/Chromium/chrome.exe"
+  case "linux":
+    bin = "/usr/bin/google-chrome-stable"
+  }
+  chrome, e := cdp.Launch(bin)
   if e != nil {
     t.Fatal(e)
   }
-  e = LaunchChrome("")
+
+  rg := NewRuleGroup("default")
+  e = rg.AppendBytes(rule1)
   if e != nil {
     t.Fatal(e)
   }
-  wg.Add(1)
-  h := &H{"JingDong"}
-  p := NewPage("01", "https://item.jd.com/100000700300.html", "")
-  e = p.Crawl(h)
+
+  p := NewPage("01", "https://item.jd.com/100000700300.html", "default")
+  e = p.Collect(chrome, rg, &Product{})
   if e != nil {
-    panic(e)
+    t.Fatal(e)
   }
-  wg.Wait()
-  ExitChrome()
+
+  wg1.Add(1)
+  wg1.Wait()
+  _ = chrome.Exit()
 }

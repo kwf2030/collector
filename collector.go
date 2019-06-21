@@ -4,20 +4,11 @@ import (
   "errors"
   "fmt"
   "html"
-  "runtime"
   "strconv"
   "sync"
   "time"
 
   "github.com/kwf2030/cdp"
-  "github.com/kwf2030/commons/conv"
-)
-
-var (
-  ErrInvalidArgs   = errors.New("invalid args")
-  ErrNoRuleMatched = errors.New("no rule matched")
-
-  chrome *cdp.Chrome
 )
 
 type Handler interface {
@@ -47,7 +38,7 @@ type Page struct {
 }
 
 func NewPage(id, url, group string) *Page {
-  if url == "" {
+  if url == "" || group == "" {
     return nil
   }
   return &Page{Id: id, Url: url, Group: group}
@@ -58,12 +49,12 @@ func (p *Page) OnCdpEvent(msg *cdp.Message) {
     // 如果超时，就有可能存在两次回调（超时一次回调和正常一次回调），
     // once是为了防止重复调用
     p.once.Do(func() {
-      m := p.crawlFields()
+      m := p.collectFields()
       if p.handler != nil {
         p.handler.OnFields(p, m)
       }
       if p.rule.Loop != nil {
-        p.crawlLoop()
+        p.collectLoop()
       }
       if p.handler != nil {
         p.handler.OnComplete(p)
@@ -72,21 +63,21 @@ func (p *Page) OnCdpEvent(msg *cdp.Message) {
   }
 }
 
-func (p *Page) OnCdpResp(msg *cdp.Message) bool {
+func (p *Page) OnCdpResponse(msg *cdp.Message) bool {
   return false
 }
 
-func (p *Page) Crawl(h Handler) error {
+func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   if p.Url == "" {
-    return ErrInvalidArgs
+    return errors.New("page url is empty")
   }
   if p.Group == "" {
-    p.Group = "default"
+    return errors.New("page group is empty")
   }
   addr := html.UnescapeString(p.Url)
-  rule := Rules.match(p.Group, addr)
+  rule := rg.match(addr)
   if rule == nil {
-    return ErrNoRuleMatched
+    return errors.New("no rule matched")
   }
   tab, e := chrome.NewTab(p)
   if e != nil {
@@ -97,7 +88,7 @@ func (p *Page) Crawl(h Handler) error {
   p.handler = h
   tab.Subscribe(cdp.Page.LoadEventFired)
   tab.Call(cdp.Page.Enable, nil)
-  tab.Call(cdp.Page.Navigate, cdp.Param{"url": addr})
+  tab.Call(cdp.Page.Navigate, map[string]interface{}{"url": addr})
   // todo 大量定时器，如果有性能问题改用时间轮
   time.AfterFunc(p.rule.timeout, func() {
     tab.FireEvent(cdp.Page.LoadEventFired, nil)
@@ -105,10 +96,10 @@ func (p *Page) Crawl(h Handler) error {
   return nil
 }
 
-func (p *Page) crawlFields() map[string]string {
+func (p *Page) collectFields() map[string]string {
   rule := p.rule
   ret := make(map[string]string, len(rule.Fields))
-  params := cdp.Param{"objectGroup": "console", "includeCommandLineAPI": true}
+  params := map[string]interface{}{"objectGroup": "console", "includeCommandLineAPI": true}
   if rule.Prepare != nil {
     if rule.Prepare.Eval != "" {
       if rule.Prepare.Eval[0] == '{' {
@@ -118,7 +109,7 @@ func (p *Page) crawlFields() map[string]string {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "false")
+      r := extract(msg.Result)
       if r != "true" {
         return ret
       }
@@ -140,7 +131,7 @@ func (p *Page) crawlFields() map[string]string {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      r := extract(msg.Result)
       ret[field.Name] = r
       params["expression"] = fmt.Sprintf("const cdp_field_%s='%s'", field.Name, r)
       p.tab.Call(cdp.Runtime.Evaluate, params)
@@ -156,9 +147,9 @@ func (p *Page) crawlFields() map[string]string {
   return ret
 }
 
-func (p *Page) crawlLoop() {
+func (p *Page) collectLoop() {
   rule := p.rule
-  params := cdp.Param{"objectGroup": "console", "includeCommandLineAPI": true}
+  params := map[string]interface{}{"objectGroup": "console", "includeCommandLineAPI": true}
   if rule.Loop.Prepare != nil {
     if rule.Loop.Prepare.Eval != "" {
       if rule.Loop.Prepare.Eval[0] == '{' {
@@ -168,7 +159,7 @@ func (p *Page) crawlLoop() {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "false")
+      r := extract(msg.Result)
       if r != "true" {
         return
       }
@@ -198,7 +189,7 @@ func (p *Page) crawlLoop() {
       params["expression"] = rule.Loop.Eval
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      r := extract(msg.Result)
       if n == 0 {
         arr[rule.Loop.ExportCycle-1] = r
       } else {
@@ -218,7 +209,7 @@ func (p *Page) crawlLoop() {
       params["expression"] = rule.Loop.Next
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := conv.GetString(conv.GetMap(msg.Result, "result"), "value", "")
+      r := extract(msg.Result)
       if r != "true" {
         if p.handler != nil && n != 0 {
           p.handler.OnLoop(p, i, arr[:n])
@@ -233,25 +224,26 @@ func (p *Page) crawlLoop() {
   }
 }
 
-func LaunchChrome(bin string, args ...string) error {
-  if bin == "" {
-    switch runtime.GOOS {
-    case "windows":
-      bin = "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
-    case "linux":
-      bin = "/usr/bin/google-chrome-stable"
+func extract(data map[string]interface{}) string {
+  r, ok := data["result"]
+  if !ok {
+    return ""
+  }
+  m, ok := r.(map[string]interface{})
+  if !ok {
+    return ""
+  }
+  v, ok := m["value"]
+  if !ok {
+    return ""
+  }
+  switch ret := v.(type) {
+  case string:
+    return ret
+  case bool:
+    if ret {
+      return "true"
     }
   }
-  var e error
-  chrome, e = cdp.Launch(bin, args...)
-  if e != nil {
-    return e
-  }
-  return nil
-}
-
-func ExitChrome() {
-  if chrome != nil {
-    chrome.Exit()
-  }
+  return ""
 }
