@@ -51,9 +51,10 @@ func (*Product) OnFields(p *Page, data map[string]string) {
   fmt.Println(data)
 }
 
-func (*Product) OnLoop(p *Page, loopCount int, data []string) {
+func (*Product) OnLoop(p *Page, loopCount int, data []string) bool {
   fmt.Println("==========OnLoop:", loopCount)
   fmt.Println(data)
+  return true
 }
 
 func (*Product) OnComplete(p *Page) {

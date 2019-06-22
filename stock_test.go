@@ -66,7 +66,7 @@ func (s *Stock) OnFields(p *Page, data map[string]string) {
   fmt.Printf("%-8s%-6s%-6s%-6s%-5s%-5s%-6s%-7s%-6s%-6s%-6s\n", "时间", "价格", "涨跌", "最高", "最低", "振幅", "换手率", "成交量", "成交额", "市盈率", "市净率")
 }
 
-func (s *Stock) OnLoop(p *Page, loopCount int, data []string) {
+func (s *Stock) OnLoop(p *Page, loopCount int, data []string) bool {
   for _, v := range data {
     m := make(map[string]string, 8)
     e := json.Unmarshal([]byte(v), &m)
@@ -75,6 +75,7 @@ func (s *Stock) OnLoop(p *Page, loopCount int, data []string) {
     }
     fmt.Printf("%-10s%-8s%-8s%-8s%-7s%-7s%-9s%-8s%-8s%-9s%-8s\n", time.Now().Format("15:04:05"), m["price"], m["rising_falling"], m["max_price"], m["min_price"], m["amplitude"], m["turnover"], m["volumes1"], m["volumes2"], m["pe"], m["pb"])
   }
+  return true
 }
 
 func (s *Stock) OnComplete(p *Page) {

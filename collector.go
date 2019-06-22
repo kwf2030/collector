@@ -12,10 +12,13 @@ import (
 )
 
 type Handler interface {
+  // 只会回调一次，所有字段一次性返回
   OnFields(*Page, map[string]string)
 
-  OnLoop(*Page, int, []string)
+  // 按设置的导出周期回调（如export_cycle=5表示5次循环回调1次），返回值表示是否继续循环
+  OnLoop(*Page, int, []string) bool
 
+  // 在OnFields和OnLoop完成后调用
   OnComplete(*Page)
 }
 
@@ -109,7 +112,7 @@ func (p *Page) collectFields() map[string]string {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := extract(msg.Result)
+      r := getValue(msg.Result)
       if r != "true" {
         return ret
       }
@@ -131,7 +134,7 @@ func (p *Page) collectFields() map[string]string {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := extract(msg.Result)
+      r := getValue(msg.Result)
       ret[field.Name] = r
       params["expression"] = fmt.Sprintf("const cdp_field_%s='%s'", field.Name, r)
       p.tab.Call(cdp.Runtime.Evaluate, params)
@@ -159,7 +162,7 @@ func (p *Page) collectLoop() {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := extract(msg.Result)
+      r := getValue(msg.Result)
       if r != "true" {
         return
       }
@@ -189,7 +192,7 @@ func (p *Page) collectLoop() {
       params["expression"] = rule.Loop.Eval
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := extract(msg.Result)
+      r := getValue(msg.Result)
       if n == 0 {
         arr[rule.Loop.ExportCycle-1] = r
       } else {
@@ -198,7 +201,9 @@ func (p *Page) collectLoop() {
     }
     if n == 0 {
       if p.handler != nil {
-        p.handler.OnLoop(p, i, arr)
+        if ok := p.handler.OnLoop(p, i, arr); !ok {
+          break
+        }
       }
       for j := 0; j < rule.Loop.ExportCycle; j++ {
         arr[j] = ""
@@ -209,7 +214,7 @@ func (p *Page) collectLoop() {
       params["expression"] = rule.Loop.Next
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := extract(msg.Result)
+      r := getValue(msg.Result)
       if r != "true" {
         if p.handler != nil && n != 0 {
           p.handler.OnLoop(p, i, arr[:n])
@@ -224,7 +229,7 @@ func (p *Page) collectLoop() {
   }
 }
 
-func extract(data map[string]interface{}) string {
+func getValue(data map[string]interface{}) string {
   r, ok := data["result"]
   if !ok {
     return ""
