@@ -109,5 +109,5 @@ func TestStock(t *testing.T) {
 
   wg2.Add(1)
   wg2.Wait()
-  _ = chrome.Exit()
+  chrome.Exit()
 }

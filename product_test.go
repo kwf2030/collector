@@ -89,5 +89,5 @@ func TestProduct(t *testing.T) {
 
   wg1.Add(1)
   wg1.Wait()
-  _ = chrome.Exit()
+  chrome.Exit()
 }
