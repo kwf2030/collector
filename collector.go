@@ -9,7 +9,10 @@ import (
   "time"
 
   "github.com/kwf2030/cdp"
+  "github.com/kwf2030/commons/base"
 )
+
+var ErrNoRuleMatched = errors.New("no rule matched")
 
 type Handler interface {
   // 只会回调一次，所有字段一次性返回
@@ -72,15 +75,12 @@ func (p *Page) OnCdpResponse(msg *cdp.Message) bool {
 
 func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   if p.Url == "" {
-    return errors.New("page url is empty")
-  }
-  if p.Group == "" {
-    return errors.New("page group is empty")
+    return base.ErrInvalidArgs
   }
   addr := html.UnescapeString(p.Url)
   rule := rg.match(addr)
   if rule == nil {
-    return errors.New("no rule matched")
+    return ErrNoRuleMatched
   }
   tab, e := chrome.NewTab(p)
   if e != nil {
@@ -92,7 +92,7 @@ func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   tab.Subscribe(cdp.Page.LoadEventFired)
   tab.Call(cdp.Page.Enable, nil)
   tab.Call(cdp.Page.Navigate, map[string]interface{}{"url": addr})
-  // todo 大量定时器，如果有性能问题改用时间轮
+  // todo 如果定时器数量很大会有性能问题（改用时间轮）
   time.AfterFunc(p.rule.timeout, func() {
     tab.FireEvent(cdp.Page.LoadEventFired, nil)
   })

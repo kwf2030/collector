@@ -8,28 +8,31 @@ import (
   "sync"
   "time"
 
+  "github.com/kwf2030/commons/base"
   "gopkg.in/yaml.v2"
 )
 
+var ErrDifferentRuleGroup = errors.New("different rule group")
+
 type RuleGroup struct {
-  Name  string
+  name  string
   rules []*Rule
-  m     *sync.RWMutex
+  mu    sync.RWMutex
 }
 
 func NewRuleGroup(name string) *RuleGroup {
   if name == "" {
     return nil
   }
-  return &RuleGroup{Name: name, rules: make([]*Rule, 0, 16), m: &sync.RWMutex{}}
+  return &RuleGroup{name: name, rules: make([]*Rule, 0, 16), mu: sync.RWMutex{}}
 }
 
 func (rg *RuleGroup) match(url string) *Rule {
   if url == "" {
     return nil
   }
-  rg.m.RLock()
-  defer rg.m.RUnlock()
+  rg.mu.RLock()
+  defer rg.mu.RUnlock()
   for _, r := range rg.rules {
     for _, p := range r.patterns {
       if p.content.MatchString(url) {
@@ -42,22 +45,19 @@ func (rg *RuleGroup) match(url string) *Rule {
 
 func (rg *RuleGroup) AppendBytes(bytes []byte) error {
   if len(bytes) == 0 {
-    return errors.New("param <bytes> is empty")
-  }
-  if rg.Name == "" {
-    return errors.New("group name is empty")
+    return base.ErrInvalidArgs
   }
   r := &Rule{}
   e := yaml.Unmarshal(bytes, r)
   if e != nil {
     return e
   }
-  if r.Group != rg.Name {
-    return errors.New("rule group not match")
+  if r.Group != rg.name {
+    return ErrDifferentRuleGroup
   }
   r.init()
-  rg.m.Lock()
-  defer rg.m.Unlock()
+  rg.mu.Lock()
+  defer rg.mu.Unlock()
   found := -1
   for i, old := range rg.rules {
     if old.Id == r.Id {
@@ -80,10 +80,7 @@ func (rg *RuleGroup) AppendBytes(bytes []byte) error {
 
 func (rg *RuleGroup) AppendFile(file string) error {
   if file == "" {
-    return errors.New("param <file> is empty")
-  }
-  if rg.Name == "" {
-    return errors.New("group name is empty")
+    return base.ErrInvalidArgs
   }
   data, e := ioutil.ReadFile(file)
   if e != nil {
@@ -94,10 +91,10 @@ func (rg *RuleGroup) AppendFile(file string) error {
 
 func (rg *RuleGroup) Remove(id string) error {
   if id == "" {
-    return errors.New("param <id> is empty")
+    return base.ErrInvalidArgs
   }
-  rg.m.Lock()
-  defer rg.m.Unlock()
+  rg.mu.Lock()
+  defer rg.mu.Unlock()
   for i, r := range rg.rules {
     if r.Id == id {
       rg.rules = append(rg.rules[:i], rg.rules[i+1:]...)
