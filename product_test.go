@@ -35,7 +35,7 @@ fields:
 loop:
   name: "comment"
   alias: "最新12页评论"
-  export_cycle: 5
+  export_cycle: 1
   prepare:
     eval: "{document.documentElement.scrollBy(0, 1000);Array.prototype.slice.call(document.querySelector('#detail > div > ul').children).filter(function (e) {return e.textContent.indexOf('商品评价') !== -1;})[0].click();true;}"
     wait: "5s"
