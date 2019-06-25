@@ -45,7 +45,7 @@ func (rg *RuleGroup) match(url string) *Rule {
 
 func (rg *RuleGroup) AppendBytes(bytes []byte) error {
   if len(bytes) == 0 {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   r := &Rule{}
   e := yaml.Unmarshal(bytes, r)
@@ -80,7 +80,7 @@ func (rg *RuleGroup) AppendBytes(bytes []byte) error {
 
 func (rg *RuleGroup) AppendFile(file string) error {
   if file == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   data, e := ioutil.ReadFile(file)
   if e != nil {
@@ -91,7 +91,7 @@ func (rg *RuleGroup) AppendFile(file string) error {
 
 func (rg *RuleGroup) Remove(id string) error {
   if id == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   rg.mu.Lock()
   defer rg.mu.Unlock()

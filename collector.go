@@ -75,7 +75,7 @@ func (p *Page) OnCdpResponse(msg *cdp.Message) bool {
 
 func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   if p.Url == "" {
-    return base.ErrInvalidArgs
+    return base.ErrInvalidArgument
   }
   addr := html.UnescapeString(p.Url)
   rule := rg.match(addr)
