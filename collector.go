@@ -94,7 +94,7 @@ func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   tab.Call(cdp.Page.Navigate, map[string]interface{}{"url": addr})
   // todo 如果定时器数量很大会有性能问题（改用时间轮）
   time.AfterFunc(p.rule.timeout, func() {
-    tab.FireEvent(cdp.Page.LoadEventFired, nil)
+    tab.Fire(cdp.Page.LoadEventFired, nil)
   })
   return nil
 }
