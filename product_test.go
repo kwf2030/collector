@@ -24,11 +24,11 @@ patterns:
 timeout: "10s"
 
 fields:
-  - name: title
+  - name: "title"
     eval: "document.querySelector('.sku-name').textContent.trim()"
     export: true
 
-  - name: price
+  - name: "price"
     eval: "document.querySelector('.J-p-100000700300').textContent.trim()"
     export: true
 
@@ -66,7 +66,7 @@ func TestProduct(t *testing.T) {
   bin := ""
   switch runtime.GOOS {
   case "windows":
-    bin = "C:/App/Chromium/chrome.exe"
+    bin = "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
   case "linux":
     bin = "/usr/bin/google-chrome-stable"
   }

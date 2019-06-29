@@ -25,27 +25,27 @@ patterns:
 timeout: "10s"
 
 fields:
-  - name: name
+  - name: "name"
     eval: "document.querySelector('.title_bg').firstElementChild.textContent.trim()"
     export: true
 
-  - name: code
+  - name: "code"
     eval: "document.querySelector('.title_bg').lastElementChild.textContent.trim()"
     export: true
 
-  - name: total_market_value
+  - name: "total_market_value"
     eval: "document.querySelectorAll('.col-2')[0].children[1].children[2].lastElementChild.textContent.trim()"
     export: true
 
-  - name: circulated_market_value
+  - name: "circulated_market_value"
     eval: "document.querySelectorAll('.col-2')[0].children[1].children[3].lastElementChild.textContent.trim()"
     export: true
 
-  - name: closing_price
+  - name: "closing_price"
     eval: "document.querySelectorAll('.col-2')[0].children[0].children[0].lastElementChild.textContent.trim()"
     export: true
 
-  - name: opening_price
+  - name: "opening_price"
     eval: "document.querySelectorAll('.col-2')[0].children[0].children[1].lastElementChild.textContent.trim()"
     export: true
 

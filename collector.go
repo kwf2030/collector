@@ -34,7 +34,7 @@ type Page struct {
   // 在该规则分组下匹配规则
   Group string
 
-  rule *Rule
+  Rule *Rule
 
   tab *cdp.Tab
 
@@ -59,7 +59,7 @@ func (p *Page) OnCdpEvent(msg *cdp.Message) {
       if p.handler != nil {
         p.handler.OnFields(p, m)
       }
-      if p.rule.Loop != nil {
+      if p.Rule.Loop != nil {
         p.collectLoop()
       }
       if p.handler != nil {
@@ -71,6 +71,12 @@ func (p *Page) OnCdpEvent(msg *cdp.Message) {
 
 func (p *Page) OnCdpResponse(msg *cdp.Message) bool {
   return false
+}
+
+func (p *Page) Close() {
+  if p.tab != nil {
+    p.tab.Close()
+  }
 }
 
 func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
@@ -86,21 +92,21 @@ func (p *Page) Collect(chrome *cdp.Chrome, rg *RuleGroup, h Handler) error {
   if e != nil {
     return e
   }
-  p.rule = rule
+  p.Rule = rule
   p.tab = tab
   p.handler = h
   tab.Subscribe(cdp.Page.LoadEventFired)
   tab.Call(cdp.Page.Enable, nil)
   tab.Call(cdp.Page.Navigate, map[string]interface{}{"url": addr})
   // todo 如果定时器数量很大会有性能问题（改用时间轮）
-  time.AfterFunc(p.rule.timeout, func() {
+  time.AfterFunc(p.Rule.timeout, func() {
     tab.Fire(cdp.Page.LoadEventFired, nil)
   })
   return nil
 }
 
 func (p *Page) collectFields() map[string]string {
-  rule := p.rule
+  rule := p.Rule
   ret := make(map[string]string, len(rule.Fields))
   params := map[string]interface{}{"objectGroup": "console", "includeCommandLineAPI": true}
   if rule.Prepare != nil {
@@ -151,7 +157,7 @@ func (p *Page) collectFields() map[string]string {
 }
 
 func (p *Page) collectLoop() {
-  rule := p.rule
+  rule := p.Rule
   params := map[string]interface{}{"objectGroup": "console", "includeCommandLineAPI": true}
   if rule.Loop.Prepare != nil {
     if rule.Loop.Prepare.Eval != "" {
