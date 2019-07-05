@@ -26,9 +26,6 @@ type Handler interface {
 }
 
 type Page struct {
-  // 页面Id（与规则Id无关）
-  Id string
-
   Url string
 
   // 在该规则分组下匹配规则
@@ -43,11 +40,11 @@ type Page struct {
   once sync.Once
 }
 
-func NewPage(id, url, group string) *Page {
+func NewPage(url, group string) *Page {
   if url == "" || group == "" {
     return nil
   }
-  return &Page{Id: id, Url: url, Group: group}
+  return &Page{Url: url, Group: group}
 }
 
 func (p *Page) OnCdpEvent(msg *cdp.Message) {

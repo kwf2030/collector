@@ -4,7 +4,6 @@ import (
   "encoding/json"
   "fmt"
   "runtime"
-  "strconv"
   "sync"
   "testing"
   "time"
@@ -109,7 +108,7 @@ func TestJZJG(t *testing.T) {
     panic(e)
   }
 
-  p := NewPage("list", "http://jzsc.mohurd.gov.cn/dataservice/query/comp/list", "group1")
+  p := NewPage("http://jzsc.mohurd.gov.cn/dataservice/query/comp/list", "group1")
   e = p.Collect(chrome, ruleGroup1, &OrgList{})
   if e != nil {
     t.Fatal(e)
@@ -131,10 +130,10 @@ func (s *OrgList) OnLoop(p *Page, loopCount int, data []string) bool {
     panic(e)
   }
   fmt.Printf("====================第%d页（%d家企业）\n", loopCount, len(arr))
-  for i, v := range arr {
+  for _, v := range arr {
     w := &sync.WaitGroup{}
     w.Add(1)
-    crawlOrg(w, i, v)
+    crawlOrg(w, v)
     w.Wait()
     time.Sleep(time.Millisecond * 500)
   }
@@ -165,12 +164,12 @@ func (s *OrgDetail) OnComplete(p *Page) {
   s.w.Done()
 }
 
-func crawlOrg(w *sync.WaitGroup, id int, url string) {
+func crawlOrg(w *sync.WaitGroup, url string) {
   if url == "" {
     return
   }
-  fmt.Println("正在采集", id, url)
-  p := NewPage(strconv.Itoa(id), url, "group2")
+  fmt.Println("正在采集", url)
+  p := NewPage(url, "group2")
   e := p.Collect(chrome, ruleGroup2, &OrgDetail{w})
   if e != nil {
     panic(e)

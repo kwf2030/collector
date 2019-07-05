@@ -101,7 +101,7 @@ func TestStock(t *testing.T) {
     t.Fatal(e)
   }
 
-  p := NewPage("01", "http://gu.qq.com/sz002024/gp", "default")
+  p := NewPage("http://gu.qq.com/sz002024/gp", "default")
   e = p.Collect(chrome, rg, &Stock{})
   if e != nil {
     t.Fatal(e)

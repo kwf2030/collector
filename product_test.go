@@ -81,7 +81,7 @@ func TestProduct(t *testing.T) {
     t.Fatal(e)
   }
 
-  p := NewPage("01", "https://item.jd.com/100000700300.html", "default")
+  p := NewPage("https://item.jd.com/100000700300.html", "default")
   e = p.Collect(chrome, rg, &Product{})
   if e != nil {
     t.Fatal(e)
