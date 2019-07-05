@@ -27,7 +27,7 @@ prepare:
   # 在eval之后、fields和loop之前等待
   wait: "2s"
 
-# 每个页面加载的超时时间（默认10s，仅对fields有效）
+# 每个页面加载的超时时间（默认10s）
 timeout: "30s"
 
 fields:
