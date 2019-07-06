@@ -114,9 +114,7 @@ func (p *Page) collectFields() map[string]string {
         params["expression"] = "{" + rule.Prepare.Eval + "}"
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-      msg := <-ch
-      r := getValue(msg.Result)
-      if r != "true" {
+      if msg := <-ch; msg.GetResultValue() != "true" {
         return ret
       }
     }
@@ -137,7 +135,7 @@ func (p *Page) collectFields() map[string]string {
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := getValue(msg.Result)
+      r := msg.GetResultValue()
       ret[field.Name] = r
       params["expression"] = fmt.Sprintf("const cdp_field_%s='%s'", field.Name, r)
       p.tab.Call(cdp.Runtime.Evaluate, params)
@@ -164,9 +162,7 @@ func (p *Page) collectLoop() {
         params["expression"] = "{" + rule.Loop.Prepare.Eval + "}"
       }
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-      msg := <-ch
-      r := getValue(msg.Result)
-      if r != "true" {
+      if msg := <-ch; msg.GetResultValue() != "true" {
         return
       }
     }
@@ -195,11 +191,10 @@ func (p *Page) collectLoop() {
       params["expression"] = rule.Loop.Eval
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
       msg := <-ch
-      r := getValue(msg.Result)
       if n == 0 {
-        arr[rule.Loop.ExportCycle-1] = r
+        arr[rule.Loop.ExportCycle-1] = msg.GetResultValue()
       } else {
-        arr[n-1] = r
+        arr[n-1] = msg.GetResultValue()
       }
     }
     if n == 0 {
@@ -216,9 +211,7 @@ func (p *Page) collectLoop() {
     if rule.Loop.Next != "" {
       params["expression"] = rule.Loop.Next
       _, ch := p.tab.Call(cdp.Runtime.Evaluate, params)
-      msg := <-ch
-      r := getValue(msg.Result)
-      if r != "true" {
+      if msg := <-ch; msg.GetResultValue() != "true" {
         if p.handler != nil && n != 0 {
           p.handler.OnLoop(p, i, arr[:n])
         }
@@ -230,28 +223,4 @@ func (p *Page) collectLoop() {
       time.Sleep(rule.Loop.wait)
     }
   }
-}
-
-func getValue(data map[string]interface{}) string {
-  r, ok := data["result"]
-  if !ok {
-    return ""
-  }
-  m, ok := r.(map[string]interface{})
-  if !ok {
-    return ""
-  }
-  v, ok := m["value"]
-  if !ok {
-    return ""
-  }
-  switch ret := v.(type) {
-  case string:
-    return ret
-  case bool:
-    if ret {
-      return "true"
-    }
-  }
-  return ""
 }
